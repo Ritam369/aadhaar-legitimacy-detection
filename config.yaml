@@ -1,0 +1,20 @@
+# Central settings. Point data_root at Google Drive when running in Colab.
+data_root: data                 # Colab: /content/drive/MyDrive/aadhaar-data
+phases:
+  phase0: true
+  phase1: false
+  phase2: false
+  phase3: false
+  phase4: false
+  phase5: false
+  phase6: false
+  phase7: false
+phase0:
+  card_size: [856, 540]         # standard resize (w, h), ~85.6 x 54 mm ratio
+  layout_grid: [8, 5]           # cols x rows for edge-density comparison
+  weight_colour: 0.5
+  weight_layout: 0.5
+  # similarity below `low` -> score 0, above `high` -> score 1, linear between.
+  # Deliberately loose: phone photos shift colours a lot.
+  low: 0.35
+  high: 0.75

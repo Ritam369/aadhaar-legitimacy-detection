@@ -1,0 +1,12 @@
+data/
+!data/README.md
+models/
+*.pt
+*.pkl
+*.h5
+*.zip
+.env
+__pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
+.venv/
