@@ -43,10 +43,8 @@ def _soft(x, low, high):
     return float(np.clip((x - low) / (high - low), 0.0, 1.0))
 
 
-def compare_to_references(img, refs, cfg):
-    """Best score across references. Returns (score, reason)."""
-    if not refs:
-        return 1.0, "No reference cards supplied; layout/colour check skipped"
+def best_match(img, refs, cfg):
+    """Return (score, colour_sim, layout_sim) for the best single reference."""
     size, grid = tuple(cfg["card_size"]), tuple(cfg["layout_grid"])
     best = (-1.0, 0.0, 0.0)
     for ref in refs:
@@ -56,5 +54,12 @@ def compare_to_references(img, refs, cfg):
             cfg["weight_layout"] * _soft(l, cfg["low"], cfg["high"])
         if s > best[0]:
             best = (s, c, l)
-    s, c, l = best
+    return best
+
+
+def compare_to_references(img, refs, cfg):
+    """Best score across references. Returns (score, reason)."""
+    if not refs:
+        return 1.0, "No reference cards supplied; layout/colour check skipped"
+    s, c, l = best_match(img, refs, cfg)
     return round(s, 3), f"Best match: colour sim {c:.2f}, layout sim {l:.2f}"
