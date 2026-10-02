@@ -14,7 +14,8 @@ CARD_SIZE = (856, 540)          # (w, h), ~85.6 x 54 mm
 _MIN_AREA_FRAC = 0.02           # card must cover at least 2% of the photo
 _ALREADY_CROPPED_FRAC = 0.90    # above this, the photo is already the card
 _MIN_RECTANGULARITY = 0.60      # contour area / its bounding rotated rectangle
-_ASPECT_RANGE = (1.2, 3.3)      # real card is ~1.585; oblique photos stretch it
+_ASPECT_RANGE = (1.4, 3.3)      # real card is ~1.585; oblique photos stretch it.
+                                # Lower bound 1.4 rejects squarish boxes such as the photo box.
 _CARD_ASPECT = 1.585
 
 
@@ -99,9 +100,17 @@ def _find_quad(img):
     return (np.asarray(best, np.float32) - pad) / scale, note
 
 
-def normalise_card(img, size=CARD_SIZE):
-    """Detect, straighten and resize the card. Falls back to a plain resize."""
-    quad, note = _find_quad(img)
+def normalise_card(img, size=CARD_SIZE, corners=None):
+    """Detect, straighten and resize the card. Falls back to a plain resize.
+
+    corners: optional 4 (x, y) points in ORIGINAL pixel coordinates (any order),
+    e.g. clicked by hand with scripts/corner_picker.html. When given, automatic
+    detection is skipped.
+    """
+    if corners is not None:
+        quad, note = np.asarray(corners, np.float32).reshape(4, 2), "manual corners"
+    else:
+        quad, note = _find_quad(img)
     if quad is None:
         return CardCrop(cv2.resize(img, size, interpolation=cv2.INTER_AREA), False, note)
 

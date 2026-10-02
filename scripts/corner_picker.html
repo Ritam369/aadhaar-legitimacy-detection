@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Aadhaar card corner picker</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 16px; background: #f4f4f4; }
+  #bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  button { padding: 6px 12px; font-size: 14px; cursor: pointer; }
+  canvas { background: #fff; border: 1px solid #999; max-width: 100%; cursor: crosshair; }
+  #info { font-weight: 600; }
+  .hint { color: #555; font-size: 13px; margin: 6px 0; }
+</style>
+</head>
+<body>
+<h3>Aadhaar card corner picker</h3>
+<p class="hint">Runs fully in your browser: images are NOT uploaded anywhere. Select the folder
+<code>data/raw</code> (it contains <code>reference/</code> and <code>test/</code>), then click the
+4 corners of the card in each image (any order). Download <code>corners.json</code> at the end
+and save it as <code>data/raw/corners.json</code>.</p>
+<div id="bar">
+  <label>Folder: <input type="file" id="folder" webkitdirectory></label>
+  <label>or files: <input type="file" id="files" multiple accept="image/*"></label>
+</div>
+<div id="bar2" style="display:none">
+  <span id="info"></span>
+  <button id="undo">Undo point</button>
+  <button id="prev">&larr; Prev</button>
+  <button id="next">Next / Skip &rarr;</button>
+  <button id="save">Download corners.json</button>
+</div>
+<canvas id="cv"></canvas>
+<script>
+const imgExt = /\.(jpe?g|png)$/i;
+let items = [], idx = 0, img = null, scale = 1, pts = [];
+const corners = {};
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const info = document.getElementById('info');
+
+function keyOf(f) {
+  // "data/raw/reference/1.png" -> "reference/1.png" (last two path parts)
+  const rel = f.webkitRelativePath || f.name;
+  const parts = rel.split('/');
+  return parts.slice(-2).join('/');
+}
+function load(fileList) {
+  items = Array.from(fileList).filter(f => imgExt.test(f.name))
+    .sort((a, b) => keyOf(a).localeCompare(keyOf(b), undefined, {numeric: true}));
+  if (!items.length) { alert('No JPG/PNG images found.'); return; }
+  document.getElementById('bar2').style.display = 'flex';
+  idx = 0; show();
+}
+document.getElementById('folder').onchange = e => load(e.target.files);
+document.getElementById('files').onchange = e => load(e.target.files);
+
+function show() {
+  const f = items[idx], key = keyOf(f);
+  pts = corners[key] ? corners[key].map(p => p.slice()) : [];
+  img = new Image();
+  img.onload = () => {
+    scale = Math.min(1, 1100 / img.width, 800 / img.height);
+    cv.width = Math.round(img.width * scale);
+    cv.height = Math.round(img.height * scale);
+    draw();
+  };
+  img.src = URL.createObjectURL(f);
+}
+function draw() {
+  ctx.drawImage(img, 0, 0, cv.width, cv.height);
+  ctx.lineWidth = 2; ctx.strokeStyle = '#e00'; ctx.fillStyle = '#e00';
+  const sp = pts.map(p => [p[0] * scale, p[1] * scale]);
+  if (sp.length > 1) {
+    ctx.beginPath(); ctx.moveTo(...sp[0]);
+    sp.slice(1).forEach(p => ctx.lineTo(...p));
+    if (sp.length === 4) ctx.closePath();
+    ctx.stroke();
+  }
+  sp.forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 5, 0, 7); ctx.fill(); });
+  const done = Object.keys(corners).length;
+  info.textContent = `${keyOf(items[idx])}  (${idx + 1}/${items.length})  points: ${pts.length}/4  saved: ${done}`;
+}
+cv.onclick = e => {
+  if (pts.length >= 4) return;
+  const r = cv.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (cv.width / r.width) / scale;
+  const y = (e.clientY - r.top) * (cv.height / r.height) / scale;
+  pts.push([Math.round(x), Math.round(y)]);
+  if (pts.length === 4) corners[keyOf(items[idx])] = pts.map(p => p.slice());
+  draw();
+};
+document.getElementById('undo').onclick = () => {
+  pts.pop(); delete corners[keyOf(items[idx])]; draw();
+};
+document.getElementById('next').onclick = () => { if (idx < items.length - 1) { idx++; show(); } };
+document.getElementById('prev').onclick = () => { if (idx > 0) { idx--; show(); } };
+document.getElementById('save').onclick = () => {
+  const blob = new Blob([JSON.stringify(corners, null, 1)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'corners.json'; a.click();
+};
+</script>
+</body>
+</html>

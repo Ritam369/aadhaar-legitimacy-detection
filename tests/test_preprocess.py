@@ -50,3 +50,10 @@ def test_upside_down_card_still_matches():
     ref = fake_card()
     flipped = _cv.rotate(card_on_table(persp=False), _cv.ROTATE_180)
     assert phase0.run(None, flipped, [ref], cfg).score > 0.6
+
+
+def test_manual_corners_override_detection():
+    photo = card_on_table(persp=False)   # card corners: (300,200) (1156,200) (1156,740) (300,740)
+    crop = normalise_card(photo, corners=[(1156, 740), (300, 200), (1156, 200), (300, 740)])
+    assert crop.detected and crop.note == "manual corners"
+    assert layout_similarity(crop.image, fake_card()) > 0.9
