@@ -6,6 +6,7 @@ Limitations: assumes the card contrasts with its background, and does not
 fix a card that is upside down (180 degrees).
 """
 from dataclasses import dataclass
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -17,6 +18,7 @@ _MIN_RECTANGULARITY = 0.60      # contour area / its bounding rotated rectangle
 _ASPECT_RANGE = (1.4, 3.3)      # real card is ~1.585; oblique photos stretch it.
                                 # Lower bound 1.4 rejects squarish boxes such as the photo box.
 _CARD_ASPECT = 1.585
+_RELIABLE_ASPECT = (1.4, 1.8)   # an undetected image outside this is not card-shaped
 
 
 @dataclass
@@ -24,6 +26,9 @@ class CardCrop:
     image: np.ndarray
     detected: bool   # True if an outline was found and straightened
     note: str
+    original: Optional[np.ndarray] = None   # untouched input (Phase 1 searches it for the QR)
+    quad: Optional[np.ndarray] = None       # corners in original pixel coords
+    reliable: bool = True                   # False = layout comparison not trustworthy
 
 
 def _order(pts):
@@ -63,6 +68,7 @@ def _find_quad(img):
     gray = cv2.GaussianBlur(cv2.cvtColor(small, cv2.COLOR_BGR2GRAY), (5, 5), 0)
 
     best, best_score, best_frac, saw_full = None, 0.0, 0.0, False
+    note = ""
     for mask in _masks(gray):
         cnts, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         for c in cnts:
@@ -106,21 +112,32 @@ def normalise_card(img, size=CARD_SIZE, corners=None):
     corners: optional 4 (x, y) points in ORIGINAL pixel coordinates (any order),
     e.g. clicked by hand with scripts/corner_picker.html. When given, automatic
     detection is skipped.
+
+    The returned CardCrop also carries the untouched input (`original`), the
+    corners found (`quad`) and `reliable`: False when no outline was found AND
+    the image is not card-shaped, so a plain resize would distort it and any
+    layout comparison on it should be skipped (not scored as fake).
     """
     if corners is not None:
         quad, note = np.asarray(corners, np.float32).reshape(4, 2), "manual corners"
     else:
         quad, note = _find_quad(img)
     if quad is None:
-        return CardCrop(cv2.resize(img, size, interpolation=cv2.INTER_AREA), False, note)
+        h0, w0 = img.shape[:2]
+        asp = max(h0, w0) / min(h0, w0)
+        reliable = _RELIABLE_ASPECT[0] <= asp <= _RELIABLE_ASPECT[1]
+        if not reliable:
+            note += "; image is not card-shaped, a plain resize would distort it"
+        src = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE) if h0 > w0 else img
+        return CardCrop(cv2.resize(src, size, interpolation=cv2.INTER_AREA),
+                        False, note, img, None, reliable)
 
     tl, tr, br, bl = _order(quad)
     top, left = np.linalg.norm(tr - tl), np.linalg.norm(bl - tl)
     if left > top:                       # card photographed in portrait
         tl, tr, br, bl = tr, br, bl, tl
-        top, left = left, top
 
     w, h = size
     dst = np.array([[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]], np.float32)
     m = cv2.getPerspectiveTransform(np.array([tl, tr, br, bl], np.float32), dst)
-    return CardCrop(cv2.warpPerspective(img, m, size), True, note)
+    return CardCrop(cv2.warpPerspective(img, m, size), True, note, img, quad)

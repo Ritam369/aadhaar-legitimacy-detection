@@ -13,3 +13,9 @@ class PhaseResult:
 
     def as_tuple(self):
         return (self.score, self.reason)
+
+    @classmethod
+    def neutral(cls, reason):
+        """Could not check (unreadable, API down, card not located...).
+        This is NOT evidence of forgery, so it scores 0.5."""
+        return cls(0.5, reason)
