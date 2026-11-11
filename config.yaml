@@ -10,6 +10,7 @@ phases:
   phase6: false
   phase7: false
 phase0:
+  normalise: true               # find + straighten the card before comparing
   card_size: [856, 540]         # standard resize (w, h), ~85.6 x 54 mm ratio
   layout_grid: [8, 5]           # cols x rows for edge-density comparison
   weight_colour: 0.5
@@ -18,3 +19,12 @@ phase0:
   # Deliberately loose: phone photos shift colours a lot.
   low: 0.35
   high: 0.75
+  threshold: 0.5                # default accept/reject line, replaced by the tuned one after evaluation
+evaluation:                     # paths are relative to data_root
+  labels: raw/test_labels.csv
+  test_dir: raw/test
+  reference_dir: raw/reference
+  tune_fraction: 0.3            # share of source cards used to choose the threshold
+  seed: 42
+  max_frr: 0.2                  # most genuine cards we accept wrongly rejecting when tuning
+  threshold_step: 0.05

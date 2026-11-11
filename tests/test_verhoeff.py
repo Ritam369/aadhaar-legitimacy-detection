@@ -3,14 +3,20 @@ from src.phase0_checksum.verhoeff import validate_aadhaar_number
 
 
 @pytest.mark.parametrize("num,expected", [
-    ("234567890124", True),     # constructed to pass
-    ("2345 6789 0124", True),   # spaces allowed
-    ("234567890125", False),    # last digit changed
-    ("123456789012", False),    # starts with 1
-    ("023456789012", False),    # starts with 0
-    ("2345 6789 012", False),   # only 11 digits
-    ("23456789012A", False),    # non-digit
+    ("234567890124", True),            # constructed to pass
+    ("2345 6789 0124", True),          # spaces allowed
+    ("234567890125", False),           # last digit changed
+    ("123456789012", False),           # starts with 1
+    ("023456789012", False),           # starts with 0
+    ("2345 6789 012", False),          # only 11 digits
+    ("23456789012A", False),           # non-digit that is not a mask character
     ("", False),
+    ("XXXX XXXX 0124", None),          # masked: cannot be checked, NOT a failure
+    ("xxxxxxxx0124", None),
+    ("**** **** 0124", None),
+    ("\u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 0124", None),
+    ("XXXX XXXX", None),               # partly masked
+    ("2345678901234567", None),        # 16 digits: Virtual ID, not checked
 ])
 def test_numbers(num, expected):
     assert validate_aadhaar_number(num)[0] is expected

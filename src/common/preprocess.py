@@ -19,6 +19,8 @@ _ASPECT_RANGE = (1.4, 3.3)      # real card is ~1.585; oblique photos stretch it
                                 # Lower bound 1.4 rejects squarish boxes such as the photo box.
 _CARD_ASPECT = 1.585
 _RELIABLE_ASPECT = (1.4, 1.8)   # an undetected image outside this is not card-shaped
+_MIN_TRUSTED_FRAC = 0.15        # an outline smaller than this is almost always an inner box
+                                # (photo, QR, text block, a picture nearby), not the card
 
 
 @dataclass
@@ -103,6 +105,8 @@ def _find_quad(img):
     if best is None:
         return None, ("photo already fills the frame" if saw_full
                       else "no card-like outline found")
+    if best_frac < _MIN_TRUSTED_FRAC:
+        return None, f"only a small shape found ({best_frac:.0%} of photo), not trusted as the card"
     return (np.asarray(best, np.float32) - pad) / scale, note
 
 
