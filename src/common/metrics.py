@@ -1,6 +1,6 @@
 """Plain-Python metrics for a screening check.
 
-Positive class = forged. Items are (label, score) pairs. A card is REJECTED
+Positive class = forged (not_aadhaar counts as forged); unknown labels are ignored. Items are (label, score) pairs. A card is REJECTED
 when score < threshold. Abstentions (score None) must be removed before calling.
 False rejection rate (FRR) = genuine cards wrongly rejected: the costly error.
 """
@@ -13,6 +13,8 @@ def _div(a, b):
 def confusion(items, threshold):
     tp = fn = fp = tn = 0
     for label, score in items:
+        if label not in ("genuine", "forged", "not_aadhaar"):
+            continue                     # 'unknown' (or anything else) is never counted
         forged = label != "genuine"
         rejected = score < threshold
         if forged and rejected:

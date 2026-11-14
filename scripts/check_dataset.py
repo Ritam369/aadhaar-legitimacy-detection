@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.common.labels import load_test_labels  # noqa: E402
 
-LABELS = {"genuine", "forged", "not_aadhaar"}
+LABELS = {"genuine", "forged", "not_aadhaar", "unknown"}
 VARIANTS = {"original", "degraded", "edited", "morphed"}
 REQUIRED_COLS = ["file", "label", "source_id", "variant"]
 IMG_EXT = (".jpg", ".jpeg", ".png")
@@ -66,8 +66,12 @@ def main():
             errors.append(f"line {i}: {f} is in the CSV but not in {test_dir}{hint}")
         if r["label"] not in LABELS:
             errors.append(f"line {i}: {f} has label '{r['label']}', expected one of {sorted(LABELS)}")
-        if r["variant_raw"] not in VARIANTS:
-            errors.append(f"line {i}: {f} has variant '{r['variant_raw']}', expected one of {sorted(VARIANTS)}")
+        allowed_variants = VARIANTS | ({""} if r["label"] == "unknown" else set())
+        if r["variant_raw"] not in allowed_variants:
+            errors.append(f"line {i}: {f} has variant '{r['variant_written']}', expected one of {sorted(VARIANTS)}"
+                          + (" (blank is allowed only for label 'unknown')" if not r["variant_raw"] else ""))
+        if r["variant_written"] != r["variant_raw"]:
+            warnings.append(f"{f}: variant '{r['variant_written']}' read as '{r['variant_raw']}'")
         if not r["source_id"]:
             errors.append(f"line {i}: {f} has no source_id")
         if r["label"] == "genuine" and r.get("tamper_type"):
@@ -108,7 +112,9 @@ def main():
                 errors.append(f"test/{f} looks like the SAME PICTURE as reference/{rn}: remove it from test")
 
     n_gen = sum(r["label"] == "genuine" for r in rows)
-    print(f"CSV rows: {len(rows)}  genuine: {n_gen}  other: {len(rows) - n_gen}  "
+    n_unk = sum(r["label"] == "unknown" for r in rows)
+    print(f"CSV rows: {len(rows)}  genuine: {n_gen}  forged/other: {len(rows) - n_gen - n_unk}  "
+          f"unknown (excluded from metrics): {n_unk}  "
           f"source cards: {len(by_source)}  genuine cards: "
           f"{len({r['source_id'] for r in rows if r['label'] == 'genuine'})}")
     print(f"Test images on disk: {len(disk)}   Reference images: {len(ref_paths)}")

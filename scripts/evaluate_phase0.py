@@ -24,7 +24,7 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.common.labels import assign_subsets, load_test_labels  # noqa: E402
+from src.common.labels import KNOWN_LABELS, assign_subsets, load_test_labels  # noqa: E402
 from src.common.metrics import choose_threshold, confusion, sweep  # noqa: E402
 from src.common.preprocess import normalise_card  # noqa: E402
 from src.phase0_checksum import phase0  # noqa: E402
@@ -69,7 +69,7 @@ def main():
         preds.append({"file": r["file"], "label": r["label"], "variant": r["variant"],
                       "card_type": r.get("card_type", ""), "side": r.get("side", ""),
                       "capture": r.get("capture", ""), "source_id": r["source_id"],
-                      "subset": subsets[r["source_id"]],
+                      "subset": subsets.get(r["source_id"], "excluded"),
                       "score": "" if abstain else res.score, "abstained": int(abstain),
                       "detected": res.details.get("detected"), "reason": res.reason})
     if missing:
@@ -83,13 +83,17 @@ def main():
 
     def items(subset=None):
         return [(p["label"], p["score"]) for p in preds
-                if p["score"] != "" and (subset is None or p["subset"] == subset)]
+                if p["label"] in KNOWN_LABELS and p["score"] != ""
+                and (subset is None or p["subset"] == subset)]
 
-    n_abs = sum(p["abstained"] for p in preds)
-    print(f"Images scored: {len(preds) - n_abs}   abstained (card not located): {n_abs} "
-          f"({n_abs / max(1, len(preds)):.0%})")
+    labelled = [p for p in preds if p["label"] in KNOWN_LABELS]
+    n_unk = len(preds) - len(labelled)
+    n_abs = sum(p["abstained"] for p in labelled)
+    print(f"Labelled images: {len(labelled)}   unknown (left out of all metrics): {n_unk}")
+    print(f"Labelled images scored: {len(labelled) - n_abs}   abstained (card not located): {n_abs} "
+          f"({n_abs / max(1, len(labelled)):.0%})")
     for s in ("tune", "final"):
-        sub = [p for p in preds if p["subset"] == s]
+        sub = [p for p in labelled if p["subset"] == s]
         print(f"  {s}: {len(sub)} images, {len({p['source_id'] for p in sub})} source cards, "
               f"{sum(p['label'] == 'genuine' for p in sub)} genuine images")
 
@@ -106,7 +110,7 @@ def main():
     print("\nCatch rate on forged images by kind (all subsets, threshold above):")
     groups = defaultdict(list)
     for p in preds:
-        if p["label"] != "genuine" and p["score"] != "":
+        if p["label"] in ("forged", "not_aadhaar") and p["score"] != "":
             groups[("variant", p["variant"])].append(p["score"] < t)
             groups[("card_type", p["card_type"])].append(p["score"] < t)
     for (k, v), hits in sorted(groups.items()):
